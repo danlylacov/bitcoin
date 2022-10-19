@@ -1,3 +1,5 @@
+from  random import randint
+
 
 class FieldElement:
 
@@ -179,7 +181,6 @@ class S256Point(Point):
 
 
 
-
 # класс верификации подписи
 class Signature:
     def __init__(self, r, s):
@@ -189,16 +190,20 @@ class Signature:
     def __repr__(self):
         return 'Signature ({:x}, {:x})'.format(self.r, self.s)
 
+# класс хранения секретной информации
+class PrivateKey:
+    def __init__(self, secret):
+        self.secret = secret
+        self.point = secret * G # self.point - открытый ключ
 
-    
+    def hex(self):
+        return '{:x}'.format(self.secret).zfill(64)
 
-
-
-
-
-
-
-
-
-
-
+    def sign(self, z): # z - message
+        k = randint(0, N)# генерация случайного числа(к - цель)
+        r = (k*G).x.num
+        k_inv = pow(k, N-2, N)
+        s = (z + r * self.secret) * k_inv % N
+        if s > N/2:
+            s = N - s
+        return Signature(r,s)# возвращение объекта класса верификации
