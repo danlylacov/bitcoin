@@ -151,6 +151,9 @@ class S256Field(FieldElement):
 
  # для уравнения кривой
 
+    def sqrt(self): # вычисление корня
+        return self**((P+1) // 4)
+
 
 
 
@@ -178,6 +181,42 @@ class S256Point(Point):
         v = sig.r * s_inv % N
         total = u * G + v * self
         return total.x.num == sig.r
+
+    def sec(self, compressed = True): # возвращает двоичные данные по алг. SEC
+        if compressed: # сжать
+            if self.y.num % 2 == 0:
+                return b'\x02' + self.x.num.to_bytes(32, 'big')
+            else:
+                return b'\x03' + self.x.num.to_bytes(32, 'big')
+        else: # не сжимать
+            return b'\x04' + self.x.num.to_bytes(32, 'big') \
+            + self.y.num.to_bytes(32, 'big')
+
+
+
+    @classmethod
+    def parse(self, sec_bin):
+        if sec_bin[0] == 4:  # <1>
+            x = int.from_bytes(sec_bin[1:33], 'big')
+            y = int.from_bytes(sec_bin[33:65], 'big')
+            return S256Point(x=x, y=y)
+        is_even = sec_bin[0] == 2  # <2>
+        x = S256Field(int.from_bytes(sec_bin[1:], 'big'))
+        # Правая часть уравнения  y^2 = x^3 + 7
+        alpha = x ** 3 + S256Field(B)
+        # Решение левой части
+        beta = alpha.sqrt()  # <3>
+        if beta.num % 2 == 0:  # <4>
+            even_beta = beta
+            odd_beta = S256Field(P - beta.num)
+        else:
+            even_beta = S256Field(P - beta.num)
+            odd_beta = beta
+        if is_even:
+            return S256Point(x, even_beta)
+        else:
+            return S256Point(x, odd_beta)
+
 
 
 
@@ -207,3 +246,18 @@ class PrivateKey:
         if s > N/2:
             s = N - s
         return Signature(r,s)# возвращение объекта класса верификации
+
+
+G = S256Point(
+    0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798,
+    0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8)
+
+z = 0xbc62d4b80d9e36da29c16c5d4d9f11731f36052c72401a76c23c0fb5a9b74423
+r = 0x37206a0610995c58074999cb9767b87af4c4978db68c06e8e6e81d282047a7c6
+s = 0x8ca63759c1157ebeaec0d03cecca119fc9a75bf8e6d0fa65c841c8e2738cdaec
+px = 0x04519fac3d910ca7e7138f7013706f619fa8f033e6ec6e09370ea38cee6a7574
+py = 0x82b51eab8c27c66e26c858a079bcdf4f1ada34cec420cafc7eac1a42216fb6c4
+point = S256Point(px, py)
+s_inv = pow(s, N-2, N)  # <1>
+u = z * s_inv % N  # <2>
+v = r * s_inv % N  # <3>
