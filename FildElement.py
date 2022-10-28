@@ -1,5 +1,5 @@
 from  random import randint
-
+from helper import *
 
 class FieldElement:
 
@@ -134,11 +134,6 @@ class Point: # x, y - координаты точки, а, б - задаём г�
             coef >>= 1  # <5>
         return result
 
-A = 0
-B = 7
-P = 2**256 - 2**32 - 977 # размерность поля
-N = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141
-
 
 
 class S256Field(FieldElement):
@@ -192,6 +187,17 @@ class S256Point(Point):
             return b'\x04' + self.x.num.to_bytes(32, 'big') \
             + self.y.num.to_bytes(32, 'big')
 
+    def hash160(self, compressed = True):
+        return hash160(self.sec(compressed))
+
+    def address(self, compressed = True, testnet = False): # возвращает адресную строку
+        h160 = self.hash160(compressed)
+        if testnet:
+            prefix = b'\x6f'
+        else:
+            prefix = b'\x00'
+        return encode_base58_checksum(prefix+h160)
+
 
 
     @classmethod
@@ -229,6 +235,22 @@ class Signature:
     def __repr__(self):
         return 'Signature ({:x}, {:x})'.format(self.r, self.s)
 
+    def der(self): # подпись в формате DER
+        # ДЛЯ r
+        rbin = self.r.to_bytes(32, byteorder='big')
+        rbin = rbin.lstrip(b'\x00') # удаление пустых байтов в начале
+        # .lstrip('X') - удаляет все символы Х из строки
+        if rbin[0] & 0x80: # & - бинарное "И"
+            rbin = b'\x00' + rbin # если в rbin есть ед. бит, добавить \х00
+        result = bytes([2, len(rbin)]) + rbin
+        # ДЛЯ s
+        sbin = self.s.to_bytes(32, byteorder='big')
+        sbin = sbin.lstrip(b'\x00')  # удаление пустых байтов в начале
+        if sbin[0] & 0x80: # & - бинарное "И"
+            sbin = b'\x00' + sbin
+        result += bytes([2, len(sbin)]) + sbin
+        return bytes([0x30, len(result)]) + result
+
 # класс хранения секретной информации
 class PrivateKey:
     def __init__(self, secret):
@@ -247,17 +269,68 @@ class PrivateKey:
             s = N - s
         return Signature(r,s)# возвращение объекта класса верификации
 
+    def wif(self, compressed=True, testnet=False):
+        secret_bytes = self.secret.to_bytes(32, 'big')
+        if testnet:
+            prefix = b'\xef'
+        else:
+            prefix = b'\x80'
+        if compressed:
+            suffix = b'\x01'
+        else:
+            suffix = b''
+        return encode_base58_checksum(prefix+secret_bytes+suffix)
+
+
+class Tx:# класс транкзакции
+    def __init__(self, version, tx_ins, tx_outs, locktime, testnet=False):
+        self.version = version # версия
+        self.tx_ins = tx_ins # ввод
+        self.tx_outs = tx_outs # вывод
+        self.locktime = locktime # время блокировки
+        self.testnet = testnet # сеть тестнет или реальная
+
+    def __repr__(self):
+        tx_ins = ''
+        for tx_in in self.tx_ins:
+            tx_ins = tx_in.__repr__() + '\n'
+        tx_outs = ''
+        for tx_out in self.tx_outs:
+            tx_outs += tx_out.__repr__() + '\n'
+        return 'tx: {}\n' \
+               'version: {}\n' \
+               'tx_ins:\n{}\n' \
+               'tx_outs:\n{}\n' \
+               'locktime: {}'\
+                .format(
+                        self.id(),
+                        self.version,
+                        tx_ins,
+                        tx_outs,
+                        self.locktime
+                                        )
+
+    def id(self):
+        return self.hash().hex()
+
+    def hash(self):
+        return hash256(self.serialize()[::-1])
+
+
+
+
+
+
 
 G = S256Point(
     0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798,
     0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8)
+A = 0
+B = 7
+P = 2**256 - 2**32 - 977 # размерность поля
+N = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141
 
-z = 0xbc62d4b80d9e36da29c16c5d4d9f11731f36052c72401a76c23c0fb5a9b74423
-r = 0x37206a0610995c58074999cb9767b87af4c4978db68c06e8e6e81d282047a7c6
-s = 0x8ca63759c1157ebeaec0d03cecca119fc9a75bf8e6d0fa65c841c8e2738cdaec
-px = 0x04519fac3d910ca7e7138f7013706f619fa8f033e6ec6e09370ea38cee6a7574
-py = 0x82b51eab8c27c66e26c858a079bcdf4f1ada34cec420cafc7eac1a42216fb6c4
-point = S256Point(px, py)
-s_inv = pow(s, N-2, N)  # <1>
-u = z * s_inv % N  # <2>
-v = r * s_inv % N  # <3>
+
+
+
+
