@@ -1,3 +1,7 @@
+from io import BytesIO
+from helper import *
+import json
+import requests
 
 
 class Tx:  # класс транкзакции
@@ -59,6 +63,14 @@ class Tx:  # класс транкзакции
         result += int_to_little_endian(self.locktime, 4)
         return result
 
+    def fee(self, testnet=False): # расчёт платы за транзакцию
+        input_sum, output_sum = 0, 0
+        for tx_in in self.tx_ins:
+            input_sum += tx_in.value(testnet=testnet)
+        for tx_out in self.tx_outs:
+            output_sum += tx_out.amount
+        return input_sum - output_sum
+
 
 class TxIn:  # ввод транзакции
     def __init__(self, prev_tx, prev_index, script_sig=None, sequence=0xffffffff):
@@ -91,6 +103,19 @@ class TxIn:  # ввод транзакции
         result += int_to_little_endian(self.sequence, 4)
         return result
 
+    def fetch_tx(self, testnet=False):
+        return TxFetcher.fetch(self.prev_tx.hex(), testnet=testnet)
+
+    def value(self, testnet=False): # -> сумма из вывода
+        tx =self.fetch_tx(testnet=testnet)
+        return tx.tx_outs[self.prev_index].amount
+
+    def script_pubkey(self, testnet=False):# сценарий ScriptPubKey -> объект типа Script
+        tx = self.fetch_tx(testnet=testnet)
+        return tx.tx_outs[self.prev_index].script_pubkey
+
+
+
 
 class TxOut:
     def __init__(self, amount, script_pubkey):
@@ -122,4 +147,26 @@ class TxFetcher:  # класс извлечения информации о тр
         else:
             return 'http://main.programmingbitcoin.com'
 
-    
+    @classmethod
+    def fetch(cls, tx_id, testnet=False, fresh=False): # извлечение класса транзакции
+        if fresh or (tx_id not in cls.cache):
+            url = '{}/tx/{}/hex'.format(cls.get_url(testnet), tx_id)
+            response = requests.get(url)
+            try:
+                raw = bytes.fromhex(response.text.strip())
+            except ValueError:
+                raise ValueError('unexpected response: {}'.format(response.text))
+            if raw[4] == 0:
+                raw = raw[:4] + raw[6:]
+                tx = Tx.parse(BytesIO(raw), testnet=testnet)
+                tx.locktime = little_endian_to_int(raw[-4:])
+            else:
+                tx = Tx.parse(BytesIO(raw), testnet=testnet)
+            if tx.id() != tx_id:
+                raise ValueError('not the same id: {} vs {}'.format(tx.id(),
+                                                                    tx_id))
+            cls.cache[tx_id] = tx
+        cls.cache[tx_id].testnet = testnet
+        return cls.cache[tx_id]
+
+
