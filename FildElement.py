@@ -1,5 +1,6 @@
-from  random import randint
+from random import randint
 from helper import *
+
 
 class FieldElement:
 
@@ -73,57 +74,57 @@ class FieldElement:
         return self.__class__(num=num, prime=self.prime)
 
 
-
-class Point: # x, y - координаты точки, а, б - задаём график
+class Point:  # x, y - координаты точки, а, б - задаём график
     # y**2 = x**2 + ax + b
-    def __init__(self, x, y, a, b): # инициализация
+    def __init__(self, x, y, a, b):  # инициализация
         self.a = a
         self.b = b
         self.x = x
         self.y = y
-        if self.x is None and  self.y is None:
+        if self.x is None and self.y is None:
             return
         if self.y ** 2 != self.x ** 3 + a * x + b:
             raise ValueError('({}, {}) is not on the curve'.format(x, y))
-    def __repr__(self): # вывод экземпляра класса
-        return 'Point({},{},{},{})'.format(self.x,self.y, self.a, self.b)
 
-    def __eq__(self, other): # проверка равенства объектов класса
+    def __repr__(self):  # вывод экземпляра класса
+        return 'Point({},{},{},{})'.format(self.x, self.y, self.a, self.b)
+
+    def __eq__(self, other):  # проверка равенства объектов класса
         return self.x == other.x and self.y == other.y \
-            and self.a == other.a and self.b == other.b
+               and self.a == other.a and self.b == other.b
 
-    def __ne__(self, other):# проверка неравенства обьекта класса
+    def __ne__(self, other):  # проверка неравенства обьекта класса
         return self.x != other.x and self.y != other.y \
-            and self.a != other.a and self.b != other.b
+               and self.a != other.a and self.b != other.b
 
-    def __add__(self, other): # перегрузка оператора сложения
-        if self.a != other.a or self.b != other.b: # проверка, что складываемые точки на одной прямой
+    def __add__(self, other):  # перегрузка оператора сложения
+        if self.a != other.a or self.b != other.b:  # проверка, что складываемые точки на одной прямой
             raise TypeError('Points {},{} are not on the same curve'
                             .format(self, other))
-        if self.x is None: # Если одна из точек None, то она бесконечно удаленная
+        if self.x is None:  # Если одна из точек None, то она бесконечно удаленная
             return other
         if other.x is None:
             return self
 
-        if self.x == other.x and self.y!= self.y: # вертикальная линия -> точка бесконечно удалённая
-            return self.__class__(None, None, self.a, self,b)
+        if self.x == other.x and self.y != self.y:  # вертикальная линия -> точка бесконечно удалённая
+            return self.__class__(None, None, self.a, self, b)
 
-        if self.x != other.x: # сложение
-            s = (other.y - self.y)/(other.x-self.x)
-            x_3 = s**2 - self.x - other.x
-            y_3 = s*(self.x - x_3) - self.y
+        if self.x != other.x:  # сложение
+            s = (other.y - self.y) / (other.x - self.x)
+            x_3 = s ** 2 - self.x - other.x
+            y_3 = s * (self.x - x_3) - self.y
             return self.__class__(x_3, y_3, self.a, self.b)
 
         if self == other:
-            s = (3 * self.x**2 + self.a) / (2 * self.y)
+            s = (3 * self.x ** 2 + self.a) / (2 * self.y)
             x = s ** 2 - 2 * self.x
             y = s * (self.x - x) - self.y
             return self.__class__(x, y, self.a, self.b)
 
-        if self == other and self.y == 0 * self.x: #  когда касательная проведена по вертикали
+        if self == other and self.y == 0 * self.x:  # когда касательная проведена по вертикали
             return self.__class__(None, None, self.a, self.b)
 
-    def __rmul__(self, coefficient): # умножение на коэффициент
+    def __rmul__(self, coefficient):  # умножение на коэффициент
         coef = coefficient
         current = self  # <1>
         result = self.__class__(None, None, self.a, self.b)  # <2>
@@ -135,7 +136,6 @@ class Point: # x, y - координаты точки, а, б - задаём г�
         return result
 
 
-
 class S256Field(FieldElement):
 
     def __init__(self, num, prime=None):
@@ -144,12 +144,16 @@ class S256Field(FieldElement):
     def __repr__(self):
         return '{:x}'.format(self.num).zfill(64)
 
- # для уравнения кривой
+    # для уравнения кривой
 
-    def sqrt(self): # вычисление корня
-        return self**((P+1) // 4)
+    def sqrt(self):  # вычисление корня
+        return self ** ((P + 1) // 4)
 
 
+A = 0
+B = 7
+P = 2 ** 256 - 2 ** 32 - 977  # размерность поля
+N = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141
 
 
 class S256Point(Point):
@@ -171,34 +175,32 @@ class S256Point(Point):
         return super().__rmul__(coef)
 
     def verify(self, z, sig):
-        s_inv = pow(sig.s, N-2, N)
+        s_inv = pow(sig.s, N - 2, N)
         u = z * s_inv % N
         v = sig.r * s_inv % N
         total = u * G + v * self
         return total.x.num == sig.r
 
-    def sec(self, compressed = True): # возвращает двоичные данные по алг. SEC
-        if compressed: # сжать
+    def sec(self, compressed=True):  # возвращает двоичные данные по алг. SEC
+        if compressed:  # сжать
             if self.y.num % 2 == 0:
                 return b'\x02' + self.x.num.to_bytes(32, 'big')
             else:
                 return b'\x03' + self.x.num.to_bytes(32, 'big')
-        else: # не сжимать
+        else:  # не сжимать
             return b'\x04' + self.x.num.to_bytes(32, 'big') \
-            + self.y.num.to_bytes(32, 'big')
+                   + self.y.num.to_bytes(32, 'big')
 
-    def hash160(self, compressed = True):
+    def hash160(self, compressed=True):
         return hash160(self.sec(compressed))
 
-    def address(self, compressed = True, testnet = False): # возвращает адресную строку
+    def address(self, compressed=True, testnet=False):  # возвращает адресную строку
         h160 = self.hash160(compressed)
         if testnet:
             prefix = b'\x6f'
         else:
             prefix = b'\x00'
-        return encode_base58_checksum(prefix+h160)
-
-
+        return encode_base58_checksum(prefix + h160)
 
     @classmethod
     def parse(self, sec_bin):
@@ -224,8 +226,6 @@ class S256Point(Point):
             return S256Point(x, odd_beta)
 
 
-
-
 # класс верификации подписи
 class Signature:
     def __init__(self, r, s):
@@ -235,39 +235,40 @@ class Signature:
     def __repr__(self):
         return 'Signature ({:x}, {:x})'.format(self.r, self.s)
 
-    def der(self): # подпись в формате DER
+    def der(self):  # подпись в формате DER
         # ДЛЯ r
         rbin = self.r.to_bytes(32, byteorder='big')
-        rbin = rbin.lstrip(b'\x00') # удаление пустых байтов в начале
+        rbin = rbin.lstrip(b'\x00')  # удаление пустых байтов в начале
         # .lstrip('X') - удаляет все символы Х из строки
-        if rbin[0] & 0x80: # & - бинарное "И"
-            rbin = b'\x00' + rbin # если в rbin есть ед. бит, добавить \х00
+        if rbin[0] & 0x80:  # & - бинарное "И"
+            rbin = b'\x00' + rbin  # если в rbin есть ед. бит, добавить \х00
         result = bytes([2, len(rbin)]) + rbin
         # ДЛЯ s
         sbin = self.s.to_bytes(32, byteorder='big')
         sbin = sbin.lstrip(b'\x00')  # удаление пустых байтов в начале
-        if sbin[0] & 0x80: # & - бинарное "И"
+        if sbin[0] & 0x80:  # & - бинарное "И"
             sbin = b'\x00' + sbin
         result += bytes([2, len(sbin)]) + sbin
         return bytes([0x30, len(result)]) + result
+
 
 # класс хранения секретной информации
 class PrivateKey:
     def __init__(self, secret):
         self.secret = secret
-        self.point = secret * G # self.point - открытый ключ
+        self.point = secret * G  # self.point - открытый ключ
 
     def hex(self):
         return '{:x}'.format(self.secret).zfill(64)
 
-    def sign(self, z): # z - message
-        k = randint(0, N)# генерация случайного числа(к - цель)
-        r = (k*G).x.num
-        k_inv = pow(k, N-2, N)
+    def sign(self, z):  # z - message
+        k = randint(0, N)  # генерация случайного числа(к - цель)
+        r = (k * G).x.num
+        k_inv = pow(k, N - 2, N)
         s = (z + r * self.secret) * k_inv % N
-        if s > N/2:
+        if s > N / 2:
             s = N - s
-        return Signature(r,s)# возвращение объекта класса верификации
+        return Signature(r, s)  # возвращение объекта класса верификации
 
     def wif(self, compressed=True, testnet=False):
         secret_bytes = self.secret.to_bytes(32, 'big')
@@ -279,18 +280,18 @@ class PrivateKey:
             suffix = b'\x01'
         else:
             suffix = b''
-        return encode_base58_checksum(prefix+secret_bytes+suffix)
+        return encode_base58_checksum(prefix + secret_bytes + suffix)
 
 
-class Tx:# класс транкзакции
+class Tx:  # класс транкзакции
     def __init__(self, version, tx_ins, tx_outs, locktime, testnet=False):
-        self.version = version # версия
-        self.tx_ins = tx_ins # ввод
-        self.tx_outs = tx_outs # вывод
-        self.locktime = locktime # время блокировки
-        self.testnet = testnet # сеть тестнет или реальная
+        self.version = version  # версия
+        self.tx_ins = tx_ins  # ввод
+        self.tx_outs = tx_outs  # вывод
+        self.locktime = locktime  # время блокировки
+        self.testnet = testnet  # сеть тестнет или реальная
 
-    def __repr__(self):
+    def __repr__(self):  # вывод класса
         tx_ins = ''
         for tx_in in self.tx_ins:
             tx_ins = tx_in.__repr__() + '\n'
@@ -301,14 +302,14 @@ class Tx:# класс транкзакции
                'version: {}\n' \
                'tx_ins:\n{}\n' \
                'tx_outs:\n{}\n' \
-               'locktime: {}'\
-                .format(
-                        self.id(),
-                        self.version,
-                        tx_ins,
-                        tx_outs,
-                        self.locktime
-                                        )
+               'locktime: {}' \
+            .format(
+            self.id(),
+            self.version,
+            tx_ins,
+            tx_outs,
+            self.locktime
+        )
 
     def id(self):
         return self.hash().hex()
@@ -316,21 +317,84 @@ class Tx:# класс транкзакции
     def hash(self):
         return hash256(self.serialize()[::-1])
 
+    @classmethod
+    def parse(cls, s, testnet=False):
+        version = little_endian_to_int(s.read(4))
+        num_inputs = read_varint(s)
+        inputs = []
+        for _ in range(num_inputs):
+            inputs.append(TxIn.parse(s))
+        num_outputs = read_varint(s)
+        outputs = []
+        for _ in range(num_outputs):
+            outputs.append(TxOut.parse(s))
+        locktime = little_endian_to_int(s.read(4))
+        return cls(version, inputs, outputs, locktime, testnet=testnet)
+
+    def serialize(self):  # транзакция -> последовательность байтов
+        result = int_to_little_endian(self.version, 4)
+        result += encode_varint(len(self.tx_ins))
+        for tx_in in self.tx_ins:
+            result += tx_in.serialize()
+        result += encode_variant(len(self.tx_outs))
+        for tx_out in self.tx_outs:
+            result += tx_out.serialize()
+        result += int_to_little_endian(self.locktime, 4)
+        return result
 
 
+class TxIn:  # ввод транзакции
+    def __init__(self, prev_tx, prev_index, script_sig=None, sequence=0xffffffff):
+        self.prev_tx = prev_tx  # индефикатор предыдущей транзакции
+        self.prev_index = prev_index  # индекс предыдущей транзакции
+        if script_sig is None:  # стандартно поле сценария пустое
+            self.script_sig = Script()
+        else:
+            self.script_sig = script_sig  # Сценарий ScriptSig
+            self.sequence = sequence  # последовательность
+
+    def __repr__(self):
+        return '{} : {}'.format(
+            self.prev_tx.hex(),
+            self.prev_index
+        )
+
+    @classmethod
+    def parse(cls, s):  # строка ввода -> объект TxIn
+        prev_tx = s.read(32)[::-1]
+        prev_index = little_endian_to_int(s.read(4))
+        script_sig = Script.parse(s)
+        sequence = little_endian_to_int(s.read(4))
+        return cls(prev_tx, prev_index, script_sig, sequence)
+
+    def serialize(self):  # ввод транзакции -> последовательность байтов
+        result = self.prev_tx[::-1]
+        result += int_to_little_endian(self.prev_index, 4)
+        result += self.script_sig.serialize()
+        result += int_to_little_endian(self.sequence, 4)
+        return result
 
 
+class TxOut:
+    def __init__(self, amount, script_pubkey):
+        self.amount = amount  # сумма
+        self.script_pubkey = script_pubkey  # сценарий
+
+    def __repr__(self):
+        return '{} : {}'.format(self.amount, self.script_pubkey)
+
+    @classmethod
+    def parse(cls, s):
+        amount = little_endian_to_int(s.read(8))
+        script_pubkey = Script.parse(s)
+        return cls(amount, script_pubkey)
+
+    def serialize(self):  # вывод транзакции -> последовательность байтов
+        result = int_to_little_endian(self.amount, 8)
+        result += self.script_pubkey.serialize()
+        return result
 
 
 G = S256Point(
     0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798,
     0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8)
-A = 0
-B = 7
-P = 2**256 - 2**32 - 977 # размерность поля
-N = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141
-
-
-
-
-
